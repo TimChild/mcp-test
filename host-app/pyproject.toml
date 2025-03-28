@@ -1,0 +1,18 @@
+[project]
+name = "host-app"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "dotenv>=0.9.9",
+    "openai>=1.14.0",
+    "reflex>=0.4.7",
+    "reflex-chakra>=0.6.0",
+]
+
+
+[tool.pyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"

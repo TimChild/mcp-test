@@ -1,0 +1,14 @@
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  install:
+    cmds:
+      - uv sync --dev
+      - uv run pre-commit install
+
+  run:
+    dir: clerk_api_demo
+    cmds:
+      - uv run reflex run
