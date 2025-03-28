@@ -5,7 +5,7 @@ version: "3"
 tasks:
   run:
     cmds:
-      - uv run mcp dev "server.py"
+      - SERVER_PORT=10001 uv run mcp dev "server.py"
 
   run-prod:
     cmds:

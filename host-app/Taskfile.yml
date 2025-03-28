@@ -9,6 +9,5 @@ tasks:
       - uv run pre-commit install
 
   run:
-    dir: clerk_api_demo
     cmds:
       - uv run reflex run
