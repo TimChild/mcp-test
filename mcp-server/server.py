@@ -1,6 +1,10 @@
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("test-server", host="localhost", port=9090)
+SERVER_PORT = 9090
+SERVER_TRANSPORT = "sse"
+
+
+mcp = FastMCP("test-server", host="localhost", port=SERVER_PORT)
 
 
 @mcp.tool(
@@ -23,6 +27,6 @@ async def get_resource(name: str) -> dict[str, str]:
 
 if __name__ == "__main__":
     print("Starting server...")
-    mcp.run(transport="sse")
+    mcp.run(transport=SERVER_TRANSPORT)
 
 print("exiting script")
