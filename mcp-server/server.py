@@ -19,3 +19,7 @@ async def get_data() -> dict[str, str]:
 )
 async def get_resource(name: str) -> dict[str, str]:
     return {"name": name}
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
