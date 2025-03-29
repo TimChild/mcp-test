@@ -24,3 +24,5 @@ async def get_resource(name: str) -> dict[str, str]:
 if __name__ == "__main__":
     print("Starting server...")
     mcp.run(transport="sse")
+
+print("exiting script")
