@@ -1,28 +1,34 @@
 import reflex as rx
 from host_app.state import State
 
+
 def sidebar_chat(chat: str) -> rx.Component:
     """A sidebar chat item.
 
     Args:
         chat: The chat item.
     """
-    return  rx.drawer.close(rx.hstack(
-        rx.button(
-            chat, on_click=lambda: State.set_chat(chat), width="80%", variant="surface"
-        ),
-        rx.button(
-            rx.icon(
-                tag="trash",
-                on_click=State.delete_chat,
-                stroke_width=1,
+    return rx.drawer.close(
+        rx.hstack(
+            rx.button(
+                chat,
+                on_click=lambda: State.set_chat(chat),
+                width="80%",
+                variant="surface",
             ),
-            width="20%",
-            variant="surface",
-            color_scheme="red",
-        ),
-        width="100%",
-    ))
+            rx.button(
+                rx.icon(
+                    tag="trash",
+                    on_click=State.delete_chat,
+                    stroke_width=1,
+                ),
+                width="20%",
+                variant="surface",
+                color_scheme="red",
+            ),
+            width="100%",
+        )
+    )
 
 
 def sidebar(trigger) -> rx.Component:
@@ -69,7 +75,7 @@ def modal(trigger) -> rx.Component:
                         on_click=State.create_chat,
                     ),
                 ),
-                background_color=rx.color("mauve", 1),
+                # background_color=rx.color("mauve", 1),
                 spacing="2",
                 width="100%",
             ),
@@ -85,9 +91,12 @@ def navbar():
                 rx.heading("Reflex Chat"),
                 rx.desktop_only(
                     rx.badge(
-                    State.current_chat,
-                    rx.tooltip(rx.icon("info", size=14), content="The current selected chat."),
-                    variant="soft"
+                        State.current_chat,
+                        rx.tooltip(
+                            rx.icon("info", size=14),
+                            content="The current selected chat.",
+                        ),
+                        variant="soft",
                     )
                 ),
                 align_items="center",

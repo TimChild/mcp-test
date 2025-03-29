@@ -1,10 +1,17 @@
 import os
+from typing import Any
 import reflex as rx
 from openai import OpenAI
 
 from dotenv import load_dotenv
+from reflex.style import SYSTEM_COLOR_MODE
 
 load_dotenv()
+
+SYSTEM_PROMPT = """
+You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
+Respond in markdown.
+"""
 
 # Checking if the API key is set properly
 if not os.getenv("OPENAI_API_KEY"):
@@ -41,12 +48,31 @@ class State(rx.State):
     # The name of the new chat.
     new_chat_name: str = ""
 
+    # New chat modal open state.
+    modal_open: bool = False
+
+    @rx.event
+    def set_new_chat_name(self, name: str) -> None:
+        """Set the name of the new chat.
+
+        Args:
+            form_data: A dict with the new chat name.
+        """
+        self.new_chat_name = name
+
+    @rx.event
+    def toggle_modal(self):
+        """Toggle the modal."""
+        self.modal_open = not self.modal_open
+
+    @rx.event
     def create_chat(self):
         """Create a new chat."""
         # Add the new chat to the list of chats.
         self.current_chat = self.new_chat_name
         self.chats[self.new_chat_name] = []
 
+    @rx.event
     def delete_chat(self):
         """Delete the current chat."""
         del self.chats[self.current_chat]
@@ -54,6 +80,7 @@ class State(rx.State):
             self.chats = DEFAULT_CHATS
         self.current_chat = list(self.chats.keys())[0]
 
+    @rx.event
     def set_chat(self, chat_name: str):
         """Set the name of the current chat.
 
@@ -71,7 +98,8 @@ class State(rx.State):
         """
         return list(self.chats.keys())
 
-    async def process_question(self, form_data: dict[str, str]):
+    @rx.event
+    async def process_question(self, form_data: dict[str, Any]):
         # Get the question from the form
         question = form_data["question"]
 
@@ -103,7 +131,7 @@ class State(rx.State):
         messages = [
             {
                 "role": "system",
-                "content": "You are a friendly chatbot named Reflex. Respond in markdown.",
+                "content": SYSTEM_PROMPT,
             }
         ]
         for qa in self.chats[self.current_chat]:
