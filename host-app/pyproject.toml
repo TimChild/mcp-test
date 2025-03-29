@@ -9,7 +9,6 @@ dependencies = [
     "langchain-mcp-adapters>=0.0.3",
     "langchain-openai>=0.3.11",
     "langgraph>=0.3.21",
-    "mcp-client",
     "openai>=1.14.0",
     "reflex>=0.7.0",
     "reflex-chakra>=0.7.0",
@@ -20,6 +19,3 @@ dependencies = [
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
-
-[tool.uv.sources]
-mcp-client = { path = "../mcp-client" }
