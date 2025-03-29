@@ -1,20 +1,29 @@
 from contextlib import asynccontextmanager
+
+from langchain_core.messages import AnyMessage
+from langgraph.prebuilt.chat_agent_executor import AgentStatePydantic
+
 from .models import QA, Update
 
-from typing import AsyncIterator
+from typing import AsyncIterator, Sequence
 
-from mcp_client.client import MCPClient
-from mcp_client.client import Agent
+from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
+
+model = ChatOpenAI(model="gpt-4o")
 
 
 @asynccontextmanager
-async def connect_client() -> AsyncIterator[MCPClient]:
-    client = MCPClient()
-    try:
-        await client.connect_to_server("http://localhost:9090/sse")
+async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
+    async with MultiServerMCPClient(
+        connections={
+            "test-server": SSEConnection(
+                transport="sse", url="http://localhost:9090/sse"
+            )
+        }
+    ) as client:
         yield client
-    finally:
-        await client.cleanup()
 
 
 async def get_response_updates(
@@ -33,7 +42,13 @@ async def get_response_updates(
     yield Update(type_="ai-delta", delta=f"Length History: {len(message_history)}\n\n")
 
     async with connect_client() as client:
-        agent = Agent(client.session)
-        response = await agent.process_query(question)
-        yield Update(type_="ai-delta", delta=response)
+        # NOTE: Tools are loaded immediately after initial connection in the LC implementation
+        tools = client.get_tools()
+        agent = create_react_agent(model, tools)
+        response = await agent.ainvoke({"messages": question})
+        validated = AgentStatePydantic.model_validate(response)
+        messages = validated.messages
+        ai_response = messages[-1].content
+        assert isinstance(ai_response, str)
+        yield Update(type_="ai-delta", delta=ai_response)
     yield Update(type_="ai-delta", delta="\n\n!!! End of response updates !!!\n\n")
