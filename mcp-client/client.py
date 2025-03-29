@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import AsyncExitStack
 from typing import Optional
 
@@ -6,7 +7,10 @@ from anthropic import Anthropic
 from anthropic.types import MessageParam, TextBlock, ToolParam
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
+from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
+
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()  # load environment variables from .env
 
@@ -26,25 +30,16 @@ class MCPClient:
     def session(self, value: ClientSession) -> None:
         self._session = value
 
-    async def connect_to_server(self, server_script_path: str) -> None:
+    async def connect_to_server(self, server_path_or_url: str) -> None:
         """Connect to an MCP server
 
         Args:
-            server_script_path: Path to the server script (.py or .js)
+            server_path_or_url: Path to the server script (.py or .js) or URL of the SSE server
         """
-        is_python = server_script_path.endswith(".py")
-        is_js = server_script_path.endswith(".js")
-        if not (is_python or is_js):
-            raise ValueError("Server script must be a .py or .js file")
-
-        command = "python" if is_python else "node"
-        server_params = StdioServerParameters(command=command, args=[server_script_path], env=None)
-
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
-        self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(
-            ClientSession(self.stdio, self.write)
-        )
+        if server_path_or_url.startswith("http"):
+            await self._connect_http_sse(server_path_or_url)
+        else:
+            await self._connect_stdio(server_path_or_url)
 
         await self.session.initialize()
 
@@ -53,8 +48,36 @@ class MCPClient:
         tools = response.tools
         print("\nConnected to server with tools:", [tool.name for tool in tools])
 
+    async def _connect_stdio(self, server_script_path: str) -> None:
+        logging.info(f"Connecting to server script: {server_script_path}")
+        is_python = server_script_path.endswith(".py")
+        is_js = server_script_path.endswith(".js")
+        if not (is_python or is_js):
+            raise ValueError("Server script must be a .py or .js file")
+        command = "python" if is_python else "node"
+        server_params = StdioServerParameters(command=command, args=[server_script_path], env=None)
+        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        self.stdio, self.write = stdio_transport
+        self.session = await self.exit_stack.enter_async_context(
+            ClientSession(self.stdio, self.write)
+        )
+
+    async def _connect_http_sse(self, server_url: str) -> None:
+        """Connect to an MCP server
+
+        Args:
+            server_url: URL of the server
+        """
+        logging.info(f"Connecting to SSE server: {server_url}")
+        sse_transport = await self.exit_stack.enter_async_context(sse_client(server_url))
+        self.sse, self.write = sse_transport
+        self.session = await self.exit_stack.enter_async_context(
+            ClientSession(self.sse, self.write)
+        )
+
     async def cleanup(self) -> None:
         """Clean up resources"""
+        logging.info("Cleaning up resources")
         await self.exit_stack.aclose()
 
 
@@ -67,6 +90,7 @@ class Agent:
         """Process a query using Claude and available tools"""
         messages: list[MessageParam] = [{"role": "user", "content": query}]
 
+        logging.info("Calling list_tools")
         response = await self.session.list_tools()
         available_tools: list[ToolParam] = [
             ToolParam(
@@ -80,6 +104,7 @@ class Agent:
         ]
 
         # Initial Claude API call
+        logging.info("Calling Claude API")
         response = self.anthropic.messages.create(
             model="claude-3-5-haiku-latest",
             max_tokens=1000,
@@ -101,6 +126,7 @@ class Agent:
                 assert tool_args is None or isinstance(tool_args, dict)
 
                 # Execute tool call
+                logging.info(f"Calling tool {tool_name}")
                 result = await self.session.call_tool(tool_name, tool_args)
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
 
@@ -120,6 +146,7 @@ class Agent:
                 )
 
                 # Get next response from Claude
+                logging.info("Calling Claude API with tool result")
                 response = self.anthropic.messages.create(
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=1000,
@@ -152,14 +179,13 @@ class Agent:
 
 
 async def main() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: python client.py <path_to_server_script>")
-        sys.exit(1)
+    if len(sys.argv) > 1:
+        raise ValueError("Usage: python client.py (no additional arguments)")
 
     client = MCPClient()
 
     try:
-        await client.connect_to_server(sys.argv[1])
+        await client.connect_to_server("http://localhost:9090/sse")
 
         agent = Agent(client.session)
         await agent.chat_loop()
