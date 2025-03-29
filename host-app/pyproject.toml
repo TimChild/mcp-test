@@ -3,12 +3,13 @@ name = "host-app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "dotenv>=0.9.9",
+    "mcp-client",
     "openai>=1.14.0",
-    "reflex>=0.4.7",
-    "reflex-chakra>=0.6.0",
+    "reflex>=0.7.0",
+    "reflex-chakra>=0.7.0",
 ]
 
 
@@ -16,3 +17,6 @@ dependencies = [
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
+
+[tool.uv.sources]
+mcp-client = { path = "../mcp-client" }
