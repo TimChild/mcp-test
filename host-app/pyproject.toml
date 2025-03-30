@@ -19,3 +19,8 @@ dependencies = [
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.3.6",
+]
