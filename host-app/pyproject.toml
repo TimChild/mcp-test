@@ -50,3 +50,10 @@ dev = [
 timeout = 300  # Global timeout for all tests (prevent indefinite hangs, but cancels all tests)
 asyncio_mode = "auto"  # Automatically detects async test functions and fixtures and treats them as marked
 asyncio_default_fixture_loop_scope = "session"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:langchain_core",
+    "ignore::DeprecationWarning:langgraph",
+    "ignore::DeprecationWarning:pydantic.v1.typing",
+
+]
