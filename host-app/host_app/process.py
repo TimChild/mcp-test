@@ -1,5 +1,4 @@
 import uuid
-from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from langchain_core.messages import (
@@ -8,23 +7,9 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.runnables.schema import EventData
-from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
 
 from .functional_langgraph import InputState, process
 from .models import QA, Update, UpdateTypes
-
-SYSTEM_PROMPT = """
-You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
-Respond in markdown.
-"""
-
-
-@asynccontextmanager
-async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
-    async with MultiServerMCPClient(
-        connections={"test-server": SSEConnection(transport="sse", url="http://localhost:9090/sse")}
-    ) as client:
-        yield client
 
 
 async def get_response_updates(question: str, message_history: list[QA]) -> AsyncIterator[Update]:

@@ -1,14 +1,17 @@
 """Regular graph version of langgraph."""
 
+from dependency_injector.wiring import Provide
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.graph import StateGraph
 from langgraph.graph.graph import CompiledGraph
 from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
+from host_app.containers import Adapters
+
 
 class GraphRunner:
-    def __init__(self, mcp_client: MultiMCPClient) -> None:
+    def __init__(self, mcp_client: MultiMCPClient = Provide[Adapters.mcp_client]) -> None:
         self.mcp_client = mcp_client
         self.graph: CompiledGraph = make_graph()
 
