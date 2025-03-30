@@ -1,12 +1,18 @@
 from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection, StdioConnection
 
 
-class MultiClient:
-    def __init__(self, lc_client: MultiServerMCPClient) -> None:
-        self.lc_client = lc_client
+class MultiMCPClient:
+    def __init__(self, connections: dict[str, SSEConnection | StdioConnection]) -> None:
+        """Initializes an adapter for multiple mcp clients.
 
-    async def __aenter__(self) -> "MultiClient":
+        Args:
+            connections: A dictionary mapping server names to connection configurations.
+                Each configuration can be either a StdioConnection or SSEConnection.
+        """
+        self.lc_client = MultiServerMCPClient(connections=connections)
+
+    async def __aenter__(self) -> "MultiMCPClient":
         """Connects to all servers during context."""
         self.lc_client = await self.lc_client.__aenter__()
         return self
