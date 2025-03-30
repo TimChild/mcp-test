@@ -35,18 +35,12 @@ Respond in markdown.
 @asynccontextmanager
 async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
     async with MultiServerMCPClient(
-        connections={
-            "test-server": SSEConnection(
-                transport="sse", url="http://localhost:9090/sse"
-            )
-        }
+        connections={"test-server": SSEConnection(transport="sse", url="http://localhost:9090/sse")}
     ) as client:
         yield client
 
 
-async def get_response_updates(
-    question: str, message_history: list[QA]
-) -> AsyncIterator[Update]:
+async def get_response_updates(question: str, message_history: list[QA]) -> AsyncIterator[Update]:
     """Get the response updates for a question.
 
     Args:
@@ -59,12 +53,18 @@ async def get_response_updates(
     yield Update(type_="ai-delta", delta=f"Question: {question}\n\n")
     yield Update(type_="ai-delta", delta=f"Length History: {len(message_history)}\n\n")
 
-    ai_response: Any = await process.ainvoke(
+    # ai_response: Any = await process.ainvoke(
+    #     input=InputState(question=question),
+    #     config={"configurable": {"thread_id": str(uuid.uuid4())}},
+    # )
+    async for event in process.astream_events(
         input=InputState(question=question),
         config={"configurable": {"thread_id": str(uuid.uuid4())}},
-    )
-    assert isinstance(ai_response, OutputState)
-    yield Update(type_="ai-delta", delta=ai_response.response_messages[-1].text())
+    ):
+        print(event)
+
+    # assert isinstance(ai_response, OutputState)
+    # yield Update(type_="ai-delta", delta=ai_response.response_messages[-1].text())
 
     yield Update(type_="ai-delta", delta="\n\n!!! End of response updates !!!\n\n")
 
