@@ -43,6 +43,7 @@ class MultiMCPClient:
             connections: A dictionary mapping server names to connection configurations.
                 Each configuration can be either a StdioConnection or SSEConnection.
         """
+        self.connections = connections
         self.lc_client = LCClientPatch(connections=connections)
 
     async def __aenter__(self) -> "MultiMCPClient":
