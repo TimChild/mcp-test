@@ -1,6 +1,14 @@
+"""Using the new Functional API for langgraph.
+
+2025-03-30 -- Unfortunately, it has a bug that prevents it from working in `.astream_events` mode.
+@task's return None instead of their values.
+"""
+
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import AsyncIterator
 
 from langchain_core.messages import (
     AIMessage,
@@ -11,12 +19,26 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
+from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.func import entrypoint, task
 from pydantic import BaseModel
 
 checkpointer = MemorySaver()
+
+SYSTEM_PROMPT = """
+You are a chatbot operating in a developer debugging environment. You can give detailed information about any information you have access to (you do not have to worry about hiding implementation details from a user).
+Respond in markdown.
+"""
+
+
+@asynccontextmanager
+async def connect_client() -> AsyncIterator[MultiServerMCPClient]:
+    async with MultiServerMCPClient(
+        connections={"test-server": SSEConnection(transport="sse", url="http://localhost:9090/sse")}
+    ) as client:
+        yield client
 
 
 class InputState(BaseModel):
