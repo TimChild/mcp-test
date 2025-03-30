@@ -1,9 +1,13 @@
 """The main Chat app."""
 
+import logging
+
 import reflex as rx
 import reflex_chakra as rc
 
 from host_app.components import chat, navbar
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def index() -> rx.Component:

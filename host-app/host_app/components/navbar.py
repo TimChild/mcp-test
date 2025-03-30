@@ -99,6 +99,8 @@ def navbar():
                         variant="soft",
                     )
                 ),
+                rx.text(f"test: {State.test_var}"),
+                rx.button("test-trigger", on_click=State.test_handler),
                 align_items="center",
             ),
             rx.hstack(
