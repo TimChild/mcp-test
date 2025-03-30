@@ -1,6 +1,9 @@
 import asyncio
+from typing import Any
+from dataclasses import dataclass
 from contextlib import asynccontextmanager
 import uuid
+from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
 from langchain_core.messages import (
@@ -10,17 +13,15 @@ from langchain_core.messages import (
     HumanMessage,
     ToolCall,
     ToolMessage,
+    get_buffer_string,
 )
-from langgraph.prebuilt.chat_agent_executor import AgentStatePydantic
-from mcp.types import CallToolResult
 
 from .models import QA, Update
 
-from typing import AsyncIterator
+from typing import AsyncIterator, reveal_type
 
 from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
 
 from langgraph.func import entrypoint, task
 from langgraph.checkpoint.memory import MemorySaver
@@ -58,13 +59,12 @@ async def get_response_updates(
     yield Update(type_="ai-delta", delta=f"Question: {question}\n\n")
     yield Update(type_="ai-delta", delta=f"Length History: {len(message_history)}\n\n")
 
-    # NOTE: Tools are loaded immediately after initial connection in the LC implementation
-    ai_response = await process.ainvoke(
+    ai_response: Any = await process.ainvoke(
         input=InputState(question=question),
         config={"configurable": {"thread_id": str(uuid.uuid4())}},
     )
-    assert isinstance(ai_response, str)
-    yield Update(type_="ai-delta", delta=ai_response)
+    assert isinstance(ai_response, OutputState)
+    yield Update(type_="ai-delta", delta=ai_response.response_messages[-1].text())
 
     yield Update(type_="ai-delta", delta="\n\n!!! End of response updates !!!\n\n")
 
@@ -77,45 +77,59 @@ class InputState(BaseModel):
 
 
 @task
-async def call_tool(tool_call: ToolCall, client: MultiServerMCPClient) -> ToolMessage:
-    tool_call_result: CallToolResult = await client.sessions["test-server"].call_tool(
-        tool_call["name"], tool_call["args"]
-    )
-    if tool_call_result.isError:
-        return ToolMessage(
-            tool_call_id=tool_call["id"],
-            content=f"Tool errored: {str(tool_call_result.content)}",
-        )
-    return ToolMessage(
-        tool_call_id=tool_call["id"], content=str(tool_call_result.content)
-    )
+async def call_tool(tool_call: ToolCall, tools: list[BaseTool]) -> ToolMessage:
+    tool = next(tool for tool in tools if tool.name == tool_call["name"])
+    tool_call_result = await tool.ainvoke(tool_call)
+    assert isinstance(tool_call_result, ToolMessage)
+    return tool_call_result
+    # tool_call_result: CallToolResult = await client.sessions["test-server"].call_tool(
+    #     tool_call["name"], tool_call["args"]
+    # )
+    # if tool_call_result.isError:
+    #     return ToolMessage(
+    #         tool_call_id=tool_call["id"],
+    #         content=f"Tool errored: {str(tool_call_result.content)}",
+    #     )
+    # return ToolMessage(
+    #     tool_call_id=tool_call["id"], content=str(tool_call_result.content)
+    # )
+
+
+@dataclass
+class OutputState:
+    response_messages: list[AIMessage | ToolMessage]
+    # response_messages: list[BaseMessage]
 
 
 @entrypoint(checkpointer=checkpointer)
-async def process(inputs: InputState) -> str:
+async def process(inputs: InputState) -> OutputState:
+    responses: list[AIMessage | ToolMessage] = []
     question = inputs.question
     model = ChatOpenAI(model="gpt-4o")
 
     async with connect_client() as client:
+        # NOTE: Tools are loaded immediately after initial connection in the LC implementation
         tools = client.get_tools()
-        print(tools)
         model = model.bind_tools(tools)
 
         messages: list[BaseMessage] = [
             SystemMessage(SYSTEM_PROMPT),
             HumanMessage(question),
         ]
-
         response: BaseMessage = await model.ainvoke(input=messages)
+        assert isinstance(response, AIMessage)
+        responses.append(response)
+        messages.append(response)
 
         assert isinstance(response, AIMessage)
         if response.tool_calls:
-            messages.append(response)
-            futures = [
-                call_tool(tool_call, client) for tool_call in response.tool_calls
-            ]
+            futures = [call_tool(tool_call, tools) for tool_call in response.tool_calls]
             results = await asyncio.gather(*futures)
+            responses.extend(results)
             messages.extend(results)
             response = await model.ainvoke(input=messages)
+            assert isinstance(response, AIMessage)
+            responses.append(response)
 
-        return response.text()
+        # return responses
+        return OutputState(response_messages=responses)
