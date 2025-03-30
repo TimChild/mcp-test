@@ -9,10 +9,12 @@ from langchain_core.messages import (
 from langchain_core.runnables.schema import EventData
 
 from .functional_langgraph import InputState, process
-from .models import QA, Update, UpdateTypes
+from .models import QA, GraphUpdate, UpdateTypes
 
 
-async def get_response_updates(question: str, message_history: list[QA]) -> AsyncIterator[Update]:
+async def get_response_updates(
+    question: str, message_history: list[QA]
+) -> AsyncIterator[GraphUpdate]:
     """Get the response updates for a question.
 
     Args:
@@ -22,8 +24,10 @@ async def get_response_updates(question: str, message_history: list[QA]) -> Asyn
     Returns:
         The response updates.
     """
-    yield Update(type_=UpdateTypes.start, data=f"Question: {question}\n\n")
-    yield Update(type_=UpdateTypes.preprocess, data=f"Length History: {len(message_history)}\n\n")
+    yield GraphUpdate(type_=UpdateTypes.start, data=f"Question: {question}\n\n")
+    yield GraphUpdate(
+        type_=UpdateTypes.preprocess, data=f"Length History: {len(message_history)}\n\n"
+    )
 
     async for event in process.astream_events(
         input=InputState(question=question),
@@ -38,22 +42,22 @@ async def get_response_updates(question: str, message_history: list[QA]) -> Asyn
                     assert isinstance(chunk, AIMessageChunk)
                     content = chunk.content
                     assert isinstance(content, str)
-                    yield Update(type_=UpdateTypes.ai_delta, delta=content)
+                    yield GraphUpdate(type_=UpdateTypes.ai_delta, delta=content)
             case "on_chat_model_end":
                 chunk = event_data.get("output", None)
                 assert isinstance(chunk, AIMessage)
-                yield Update(type_=UpdateTypes.ai_message_end)
+                yield GraphUpdate(type_=UpdateTypes.ai_message_end)
             case "on_tool_start":
                 chunk = event_data.get("input", None)
                 assert isinstance(chunk, dict)
-                yield Update(type_=UpdateTypes.tool_start, name=event["name"], data=chunk)
+                yield GraphUpdate(type_=UpdateTypes.tool_start, name=event["name"], data=chunk)
             case "on_tool_end":
                 chunk = event_data.get("output", None)
                 assert isinstance(chunk, ToolMessage)
-                yield Update(
+                yield GraphUpdate(
                     type_=UpdateTypes.tool_end, name=event["name"], data=str(chunk.content)
                 )
             case _:
                 print(f"Ignoring event: {event_type}")
 
-    yield Update(type_=UpdateTypes.end, data="\n\n!!! End of response updates !!!\n\n")
+    yield GraphUpdate(type_=UpdateTypes.end, data="\n\n!!! End of response updates !!!\n\n")

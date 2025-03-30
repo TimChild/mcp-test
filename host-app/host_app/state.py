@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from reflex.event import EventType
 
-from .models import QA, Update, UpdateTypes
+from .models import QA, GraphUpdate, UpdateTypes
 from .process import get_response_updates
 
 load_dotenv()
@@ -138,7 +138,7 @@ class State(rx.State):
         async for update in get_response_updates(
             question=question, message_history=self.chats[self.current_chat][:-1]
         ):
-            update: Update
+            update: GraphUpdate
             match update.type_:
                 case UpdateTypes.start:
                     logging.debug("Start update")
