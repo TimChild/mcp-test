@@ -4,7 +4,6 @@ import reflex_chakra as rc
 from host_app.components import loading_icon
 from host_app.state import QA, State
 
-
 message_style = dict(
     display="inline-block",
     padding="1em",

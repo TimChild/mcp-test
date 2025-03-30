@@ -1,7 +1,8 @@
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
+
 import reflex as rx
-from dataclasses import dataclass
 
 
 class UpdateTypes(StrEnum):

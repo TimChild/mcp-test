@@ -1,15 +1,16 @@
 import asyncio
 import logging
-import time
 import os
+import time
 from typing import Any, AsyncIterator
-import reflex as rx
-from openai import OpenAI
 
+import reflex as rx
 from dotenv import load_dotenv
+from openai import OpenAI
 from reflex.event import EventType
+
+from .models import QA, Update, UpdateTypes
 from .process import get_response_updates
-from .models import QA, UpdateTypes, Update
 
 load_dotenv()
 
@@ -64,19 +65,19 @@ class State(rx.State):
         self.new_chat_name = name
 
     @rx.event
-    def toggle_modal(self):
+    def toggle_modal(self) -> None:
         """Toggle the modal."""
         self.modal_open = not self.modal_open
 
     @rx.event
-    def create_chat(self):
+    def create_chat(self) -> None:
         """Create a new chat."""
         # Add the new chat to the list of chats.
         self.current_chat = self.new_chat_name
         self.chats[self.new_chat_name] = []
 
     @rx.event
-    def delete_chat(self):
+    def delete_chat(self) -> None:
         """Delete the current chat."""
         del self.chats[self.current_chat]
         if len(self.chats) == 0:
@@ -84,7 +85,7 @@ class State(rx.State):
         self.current_chat = list(self.chats.keys())[0]
 
     @rx.event
-    def set_chat(self, chat_name: str):
+    def set_chat(self, chat_name: str) -> None:
         """Set the name of the current chat.
 
         Args:
@@ -173,7 +174,7 @@ class State(rx.State):
         self.current_status = ""
         self.processing = False
 
-    async def openai_process_question(self, question: str):
+    async def openai_process_question(self, question: str) -> AsyncIterator[None]:
         """Get the response from the API.
 
         Args:
