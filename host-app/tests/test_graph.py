@@ -1,10 +1,22 @@
 from typing import Any
 
 import pytest
+from dependency_injector.wiring import Provide, inject
+from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.graph.graph import CompiledGraph
+from mcp_client import MultiMCPClient
 
+from host_app.containers import Adapters, Application
 from host_app.graph import GraphRunner, InputState, OutputState, make_graph
 from host_app.models import GraphUpdate, UpdateTypes
+
+
+@pytest.fixture(autouse=True)
+def container() -> Application:
+    container = Application()
+    container.config.from_yaml("config.yml")
+    container.wire(modules=["host_app.graph"])
+    return container
 
 
 def test_compile_graph():
@@ -27,6 +39,9 @@ async def test_invoke_graph(graph: CompiledGraph):
 def test_init_graph_runner():
     runner = GraphRunner()
     assert isinstance(runner, GraphRunner)
+    connections = runner.mcp_client.connections
+    assert isinstance(connections, dict)
+    assert list(connections.keys()) == ["example_server"]
 
 
 @pytest.fixture

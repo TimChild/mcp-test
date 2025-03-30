@@ -15,8 +15,9 @@ core:
       handlers: ["console"]
 
 adapters:
+  # Servers as either urls or paths to python modules (not javascript for now)
   mcp_servers:
-    - "http://localhost:9090/sse"
+    example_server: "http://localhost:9090/sse"
 
   database:
     dsn: ":memory:"
