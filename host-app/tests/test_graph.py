@@ -4,7 +4,7 @@ import pytest
 from langgraph.graph.graph import CompiledGraph
 
 from host_app.graph import GraphRunner, InputState, OutputState, make_graph
-from host_app.models import GraphUpdate
+from host_app.models import GraphUpdate, UpdateTypes
 
 
 def test_compile_graph():
@@ -41,3 +41,5 @@ async def test_astream_graph_runner(graph_runner: GraphRunner):
         updates.append(update)
 
     assert len(updates) > 0
+    assert updates[0].type_ == UpdateTypes.graph_start
+    assert updates[-1].type_ == UpdateTypes.graph_end
