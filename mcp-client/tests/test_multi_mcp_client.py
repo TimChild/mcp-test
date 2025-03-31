@@ -1,4 +1,5 @@
 import pytest
+from langchain_core.messages.tool import ToolMessage
 from langchain_mcp_adapters.client import StdioConnection
 
 from mcp_client import MultiMCPClient
@@ -42,3 +43,9 @@ async def test_get_tools(client: MultiMCPClient):
 
     assert isinstance(tools, list)
     assert len(tools) > 0
+
+
+async def test_call_tool(client: MultiMCPClient):
+    result = await client.call_tool(server_name="example", tool_name="test-tool")
+    assert isinstance(result, dict)
+    assert result == {"data": "Hello World!"}
