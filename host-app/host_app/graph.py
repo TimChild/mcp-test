@@ -126,8 +126,13 @@ async def process(
         assert isinstance(response, AIMessage)
         if response.tool_calls:
             logging.debug("Calling tools")
-            results = await ToolNode(tools=tools, name="tool_node").ainvoke(input=response)
+            messages_state = await ToolNode(tools=tools, name="tool_node").ainvoke(
+                input={"messages": messages}
+            )
+            results = messages_state["messages"]
+            print("\n\n\n --------------- \n\n\n")
             print(type(results))
+            print(results)
             responses.extend(results)
             messages.extend(results)
             logging.debug("Got tool responses")

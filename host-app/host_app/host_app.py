@@ -31,6 +31,11 @@ def make_app() -> rx.App:
     container = Application()
     container.config.core.init_resources()
     container.config.adapters.init_resources()
+    container.wire(
+        modules=[
+            ".graph",
+        ]
+    )
 
     # Add state and page to the app.
     app = rx.App(
