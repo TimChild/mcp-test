@@ -4,7 +4,6 @@ import reflex_chakra as rc
 from host_app.components import loading_icon
 from host_app.state import QA, State
 
-
 message_style = dict(
     display="inline-block",
     padding="1em",
@@ -69,16 +68,20 @@ def action_bar() -> rx.Component:
             rc.form(
                 rc.form_control(
                     rx.hstack(
-                        rx.input(
-                            rx.input.slot(
-                                rx.tooltip(
-                                    rx.icon("info", size=18),
-                                    content="Enter a question to get a response.",
-                                )
+                        rx.vstack(
+                            rx.cond(State.current_status, rx.text(State.current_status)),
+                            rx.input(
+                                rx.input.slot(
+                                    rx.tooltip(
+                                        rx.icon("info", size=18),
+                                        content="Enter a question to get a response.",
+                                    )
+                                ),
+                                placeholder="Type something...",
+                                id="question",
+                                width=["15em", "20em", "45em", "50em", "50em", "50em"],
                             ),
-                            placeholder="Type something...",
-                            id="question",
-                            width=["15em", "20em", "45em", "50em", "50em", "50em"],
+                            align="center",
                         ),
                         rx.button(
                             rx.cond(

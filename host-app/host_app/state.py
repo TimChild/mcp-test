@@ -1,12 +1,16 @@
+import asyncio
+import logging
 import os
+import time
 from typing import Any, AsyncIterator
-import reflex as rx
-from openai import OpenAI
 
+import reflex as rx
 from dotenv import load_dotenv
+from openai import OpenAI
 from reflex.event import EventType
+
+from .models import QA, GraphUpdate, UpdateTypes
 from .process import get_response_updates
-from .models import QA
 
 load_dotenv()
 
@@ -28,6 +32,8 @@ DEFAULT_CHATS = {
 class State(rx.State):
     """The app state."""
 
+    test_var: int = 0
+
     # A dict from the chat name to the list of questions and answers.
     chats: dict[str, list[QA]] = DEFAULT_CHATS
 
@@ -39,6 +45,9 @@ class State(rx.State):
 
     # Whether we are processing the question.
     processing: bool = False
+
+    # The current status.
+    current_status: str = ""
 
     # The name of the new chat.
     new_chat_name: str = ""
@@ -56,19 +65,19 @@ class State(rx.State):
         self.new_chat_name = name
 
     @rx.event
-    def toggle_modal(self):
+    def toggle_modal(self) -> None:
         """Toggle the modal."""
         self.modal_open = not self.modal_open
 
     @rx.event
-    def create_chat(self):
+    def create_chat(self) -> None:
         """Create a new chat."""
         # Add the new chat to the list of chats.
         self.current_chat = self.new_chat_name
         self.chats[self.new_chat_name] = []
 
     @rx.event
-    def delete_chat(self):
+    def delete_chat(self) -> None:
         """Delete the current chat."""
         del self.chats[self.current_chat]
         if len(self.chats) == 0:
@@ -76,7 +85,7 @@ class State(rx.State):
         self.current_chat = list(self.chats.keys())[0]
 
     @rx.event
-    def set_chat(self, chat_name: str):
+    def set_chat(self, chat_name: str) -> None:
         """Set the name of the current chat.
 
         Args:
@@ -94,9 +103,15 @@ class State(rx.State):
         return list(self.chats.keys())
 
     @rx.event
-    async def process_question(
-        self, form_data: dict[str, Any]
-    ) -> AsyncIterator[EventType | None]:
+    async def test_handler(self) -> AsyncIterator[EventType]:
+        t = time.time()
+        while time.time() - t < 5:
+            self.test_var += 1
+            yield rx.toast.info(f"Test var: {self.test_var}")
+            await asyncio.sleep(0.5)
+
+    @rx.event
+    async def process_question(self, form_data: dict[str, Any]) -> AsyncIterator[EventType | None]:
         # Get the question from the form
         question = form_data["question"]
 
@@ -113,9 +128,7 @@ class State(rx.State):
         async for event in question_processor(question):
             yield event
 
-    async def general_process_question(
-        self, question: str
-    ) -> AsyncIterator[EventType | None]:
+    async def general_process_question(self, question: str) -> AsyncIterator[EventType | None]:
         qa = QA(question=question, answer="")
         self.chats[self.current_chat].append(qa)
 
@@ -123,19 +136,47 @@ class State(rx.State):
         yield
 
         async for update in get_response_updates(
-            question=question, message_history=self.chats[self.current_chat][:-1]
+            question=question,
+            message_history=self.chats[self.current_chat][:-1],
+            conversation_id=self.current_chat,
         ):
+            update: GraphUpdate
             match update.type_:
-                case "ai-delta":
+                case UpdateTypes.start:
+                    logging.debug("Start update")
+                    self.current_status = f"Starting: {update.data}"
+                case UpdateTypes.ai_delta:
+                    logging.debug("AI delta update")
                     self.chats[self.current_chat][-1].answer += update.delta
                     self.chats = self.chats
-                    yield
+                case UpdateTypes.ai_message_end:
+                    logging.debug("AI message end update")
+                    pass
+                case UpdateTypes.tool_start:
+                    logging.debug("Tool start update")
+                    self.chats[self.current_chat][
+                        -1
+                    ].answer += f"\n\n---\n\nStarting tool: {update.name} -- ({update.data})\n\n..."
+                    self.chats = self.chats
+                    self.current_status = f"Starting tool: {update.name} -- ({update.data})"
+                case UpdateTypes.tool_end:
+                    logging.debug("Tool end update")
+                    self.chats[self.current_chat][
+                        -1
+                    ].answer += f"\n\nEnding tool: {update.name} -- ({update.data})\n\n---\n\n"
+                    self.current_status = f"Ending tool: {update.name} -- ({update.data})"
+                case UpdateTypes.end:
+                    logging.debug("End update")
+                    self.current_status = f"Ending: {update.data}"
                 case _:
-                    yield rx.toast.error(f"Unknown update type: {update.type_}")
+                    logging.debug(f"Unknown update type: {update.type_}")
+                    self.current_status = f"Unknown update type: {update.type_}"
+            yield
 
+        self.current_status = ""
         self.processing = False
 
-    async def openai_process_question(self, question: str):
+    async def openai_process_question(self, question: str) -> AsyncIterator[None]:
         """Get the response from the API.
 
         Args:

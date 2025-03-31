@@ -1,9 +1,16 @@
 """The main Chat app."""
 
+import logging
+
 import reflex as rx
 import reflex_chakra as rc
+from reflex.config import environment
 
 from host_app.components import chat, navbar
+
+from .containers import Application
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def index() -> rx.Component:
@@ -20,11 +27,28 @@ def index() -> rx.Component:
     )
 
 
-# Add state and page to the app.
-app = rx.App(
-    theme=rx.theme(
-        appearance="dark",
-        accent_color="indigo",
-    ),
-)
-app.add_page(index)
+def make_app() -> rx.App:
+    container = Application()
+    container.config.core.init_resources()
+    container.config.adapters.init_resources()
+    container.wire(
+        modules=[
+            ".graph",
+        ]
+    )
+
+    # Add state and page to the app.
+    app = rx.App(
+        theme=rx.theme(
+            appearance="dark",
+            accent_color="indigo",
+        ),
+    )
+    app.add_page(index)
+    return app
+
+
+if env := environment.REFLEX_ENV_MODE.get():
+    compile_context = environment.REFLEX_COMPILE_CONTEXT.get()
+    print(f"Running in {env} mode. Compile context: {compile_context}")
+    app = make_app()
