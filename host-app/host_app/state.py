@@ -136,7 +136,9 @@ class State(rx.State):
         yield
 
         async for update in get_response_updates(
-            question=question, message_history=self.chats[self.current_chat][:-1]
+            question=question,
+            message_history=self.chats[self.current_chat][:-1],
+            conversation_id=self.current_chat,
         ):
             update: GraphUpdate
             match update.type_:

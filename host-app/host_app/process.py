@@ -1,28 +1,27 @@
+import logging
 import uuid
 from typing import AsyncIterator
 
-from langchain_core.messages import (
-    AIMessage,
-    AIMessageChunk,
-    ToolMessage,
-)
-from langchain_core.runnables.schema import EventData
-
-from .functional_langgraph import InputState, process
+from .functional_langgraph import InputState
 from .graph import GraphRunner
 from .models import QA, GraphUpdate, UpdateTypes
 
 
 async def get_response_updates(
-    question: str, message_history: list[QA]
+    question: str,
+    message_history: list[QA],
+    conversation_id: str | None = None,
+    thread_id: str | None = None,
 ) -> AsyncIterator[GraphUpdate]:
+    thread_id = thread_id or str(uuid.uuid4())
     yield GraphUpdate(type_=UpdateTypes.start, data=f"Question: {question}\n\n")
     yield GraphUpdate(
         type_=UpdateTypes.preprocess, data=f"Length History: {len(message_history)}\n\n"
     )
+    logging.critical(f"calling with Conversation ID: {conversation_id}")
     async for update in GraphRunner().astream_events(
-        input=InputState(question=question),
-        thread_id=str(uuid.uuid4()),
+        input=InputState(question=question, conversation_id=conversation_id),
+        thread_id=thread_id,
     ):
         yield update
 

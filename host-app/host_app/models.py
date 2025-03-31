@@ -3,6 +3,17 @@ from enum import StrEnum
 from typing import Any
 
 import reflex as rx
+from langchain_core.messages import AIMessage, ToolMessage
+from pydantic import BaseModel
+
+
+class InputState(BaseModel):
+    question: str
+    conversation_id: str | None = None
+
+
+class OutputState(BaseModel):
+    response_messages: list[AIMessage | ToolMessage]
 
 
 class UpdateTypes(StrEnum):

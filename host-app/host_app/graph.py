@@ -1,8 +1,9 @@
 """Regular graph version of langgraph."""
 
+import json
 import logging
 import uuid
-from typing import AsyncIterator, Literal
+from typing import AsyncIterator, Sequence
 
 from dependency_injector.wiring import Provide, inject
 from langchain_core.language_models import BaseChatModel
@@ -12,25 +13,24 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
-    ToolCall,
     ToolMessage,
+    messages_from_dict,
+    messages_to_dict,
 )
 from langchain_core.runnables.schema import EventData
-from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import MultiServerMCPClient, SSEConnection
-from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.func import entrypoint, task
 from langgraph.graph import StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import ToolNode
-from langgraph.types import Command
+from langgraph.store.base import BaseStore
+from langgraph.store.memory import InMemoryStore
 from mcp_client import MultiMCPClient
 from pydantic import BaseModel
 
-from host_app.containers import Adapters, Application, LLMs
+from host_app.containers import Application
 
-from .models import GraphUpdate, UpdateTypes
+from .models import GraphUpdate, InputState, OutputState, UpdateTypes
 
 
 class GraphRunner:
@@ -82,14 +82,7 @@ class GraphRunner:
 class FullState(BaseModel):
     question: str
     response_messages: list[AIMessage | ToolMessage] = []
-
-
-class InputState(BaseModel):
-    question: str
-
-
-class OutputState(BaseModel):
-    response_messages: list[AIMessage | ToolMessage]
+    conversation_id: str | None = None
 
 
 SYSTEM_PROMPT = """
@@ -98,16 +91,27 @@ Respond in markdown.
 """
 
 
-# async def process(inputs: InputState, mcp_client: MultiMCPClient = Provide[Adapters.mcp_client], chat_model: BaseChatModel = Provide[LLMs.main_model]) -> Command[Literal["__end__", "tool_node"]]:
 @inject
 async def process(
-    inputs: InputState,
+    state: InputState,
+    store: BaseStore,
     mcp_client: MultiMCPClient = Provide[Application.adapters.mcp_client],
     chat_model: BaseChatModel = Provide[Application.llms.main_model],
 ) -> OutputState:
     responses: list[AIMessage | ToolMessage] = []
-    question = inputs.question
+    question = state.question
     logging.debug(f"Processing question: {question}")
+
+    previous_messages: Sequence[BaseMessage] = []
+    logging.critical(f"Conversation ID: {state.conversation_id}")
+    if state.conversation_id:
+        logging.critical(f"Conversation ID: {state.conversation_id}")
+        found = await store.aget(namespace=("messages",), key=state.conversation_id)
+        logging.critical(f"Found: {found}")
+        if found:
+            previous_messages = messages_from_dict(found.value["messages"])
+    else:
+        previous_messages = []
 
     async with mcp_client as client:
         tools = await client.get_tools()
@@ -115,6 +119,7 @@ async def process(
 
         messages: list[BaseMessage] = [
             SystemMessage(SYSTEM_PROMPT),
+            *previous_messages,
             HumanMessage(question),
         ]
         response: BaseMessage = await model.ainvoke(input=messages)
@@ -147,19 +152,34 @@ async def process(
 
         logging.debug("Returning responses")
         # return responses
-    update = OutputState(response_messages=[AIMessage(content=f"Received: {inputs.question}")])
+    update = OutputState(response_messages=[AIMessage(content=f"Received: {state.question}")])
+    if state.conversation_id:
+        logging.critical(f"Saving messages for conversation ID: {state.conversation_id}")
+        await store.aput(
+            namespace=("messages",),
+            key=state.conversation_id,
+            value={"messages": messages_to_dict(messages)},
+        )
     return update
     # return Command(update=update, goto=["tool_caller_node", "sub_assistant_caller_node"])
 
 
-def make_graph(checkpointer: None = None) -> CompiledGraph:
-    graph = StateGraph(state_schema=FullState)
+def make_graph(
+    checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None
+) -> CompiledGraph:
+    checkpointer = checkpointer or MemorySaver()
+    store = store or InMemoryStore()
 
+    graph = StateGraph(state_schema=FullState)
     graph.add_node("process", process)
     # graph.add_node("tool_node", ToolNode)
     graph.set_entry_point("process")
 
     compiled_graph = graph.compile(
-        checkpointer=checkpointer, interrupt_before=None, interrupt_after=None, debug=True
+        checkpointer=checkpointer,
+        store=store,
+        interrupt_before=None,
+        interrupt_after=None,
+        debug=True,
     )
     return compiled_graph
