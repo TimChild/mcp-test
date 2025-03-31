@@ -1,0 +1,9 @@
+[submodule "mcp-client"]
+	path = mcp-client
+	url = git@github.com:/TimChild/test-mcp-client
+[submodule "mcp-server"]
+	path = mcp-server
+	url = git@github.com:/TimChild/test-mcp-server
+[submodule "host-app"]
+	path = host-app
+	url = git@github.com:/TimChild/test-mcp-app
